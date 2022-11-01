@@ -1,0 +1,40 @@
+2022-10-31 10:58:05,680 - pyswarms.single.global_best - INFO - Optimize for 1000 iters with {'c1': 0.5, 'c2': 0.3, 'w': 0.9}
+2022-10-31 10:58:07,000 - pyswarms.single.global_best - INFO - Optimization finished | best cost: 1.4450676977066122e-17, best pos: [1.         0.99999999]
+2022-10-31 11:33:21,675 - matplotlib.font_manager - WARNING - findfont: Font family ['KaiTi'] not found. Falling back to DejaVu Sans.
+2022-10-31 11:33:21,697 - matplotlib.font_manager - WARNING - findfont: Font family ['KaiTi'] not found. Falling back to DejaVu Sans.
+2022-10-31 11:52:12,818 - pyswarms.single.global_best - INFO - Optimize for 1000 iters with {'c1': 0.5, 'c2': 0.3, 'w': 0.9}
+2022-10-31 11:52:14,128 - pyswarms.single.global_best - INFO - Optimization finished | best cost: 1.591676457548263e-41, best pos: [-8.61219641e-23 -3.98865235e-21]
+2022-10-31 11:54:33,446 - pyswarms.discrete.binary - INFO - Optimize for 1000 iters with {'c1': 0.5, 'c2': 0.3, 'w': 0.9, 'k': 5, 'p': 2}
+2022-10-31 11:54:35,008 - pyswarms.discrete.binary - INFO - Optimization finished | best cost: 0.0, best pos: [0 0]
+2022-10-31 11:59:09,447 - pyswarms.discrete.binary - INFO - Optimize for 1000 iters with {'c1': 0.5, 'c2': 0.3, 'w': 0.9, 'k': 5, 'p': 2}
+2022-10-31 12:00:10,121 - pyswarms.discrete.binary - INFO - Optimize for 1000 iters with {'c1': 0.5, 'c2': 0.3, 'w': 0.9, 'k': 5, 'p': 2}
+2022-10-31 12:00:11,730 - pyswarms.discrete.binary - INFO - Optimization finished | best cost: 0.0, best pos: [1 1]
+2022-10-31 12:01:10,923 - pyswarms.discrete.binary - INFO - Optimize for 1000 iters with {'c1': 0.5, 'c2': 0.3, 'w': 0.9, 'k': 5, 'p': 2}
+2022-10-31 12:01:12,657 - pyswarms.discrete.binary - INFO - Optimization finished | best cost: 0.0, best pos: [1 1]
+2022-10-31 12:02:14,674 - pyswarms.discrete.binary - INFO - Optimize for 100 iters with {'c1': 0.5, 'c2': 0.3, 'w': 0.9, 'k': 5, 'p': 2}
+2022-10-31 12:02:14,832 - pyswarms.discrete.binary - INFO - Optimization finished | best cost: 0.0, best pos: [1 1]
+2022-10-31 12:03:04,879 - pyswarms.discrete.binary - INFO - Optimize for 100 iters with {'c1': 0.5, 'c2': 0.3, 'w': 0.9, 'k': 5, 'p': 2}
+2022-10-31 12:03:28,105 - pyswarms.discrete.binary - INFO - Optimize for 2 iters with {'c1': 0.5, 'c2': 0.3, 'w': 0.9, 'k': 5, 'p': 2}
+2022-10-31 12:03:28,116 - pyswarms.discrete.binary - INFO - Optimization finished | best cost: 0.0, best pos: [1 1]
+2022-10-31 12:03:56,992 - pyswarms.discrete.binary - INFO - Optimize for 2 iters with {'c1': 0.5, 'c2': 0.3, 'w': 0.9, 'k': 5, 'p': 2}
+2022-10-31 12:03:56,999 - pyswarms.discrete.binary - INFO - Optimization finished | best cost: 0.0, best pos: [0]
+2022-10-31 12:04:54,083 - pyswarms.discrete.binary - INFO - Optimize for 2 iters with {'c1': 0.5, 'w': 0.9, 'k': 5, 'p': 2}
+2022-10-31 12:04:54,088 - pyswarms.backend.operators - ERROR - Missing keyword in swarm.options
+Traceback (most recent call last):
+  File "/data/yutingh/miniconda3/envs/exp/lib/python3.9/site-packages/pyswarms/backend/operators.py", line 129, in compute_velocity
+    c2 = swarm.options["c2"]
+KeyError: 'c2'
+2022-10-31 12:05:04,078 - pyswarms.discrete.binary - INFO - Optimize for 2 iters with {'c1': 0.5, 'c2': 0.3, 'w': 0.9, 'k': 5, 'p': 2}
+2022-10-31 12:05:04,090 - pyswarms.discrete.binary - INFO - Optimization finished | best cost: 1.0, best pos: [1]
+2022-10-31 12:05:49,963 - pyswarms.discrete.binary - INFO - Optimize for 2 iters with {'c1': 0.5, 'c2': 0.3, 'w': 0.9, 'k': 5, 'p': 2}
+2022-10-31 12:05:49,973 - pyswarms.discrete.binary - INFO - Optimization finished | best cost: 0.0, best pos: [0]
+2022-10-31 12:06:13,615 - pyswarms.discrete.binary - INFO - Optimize for 2 iters with {'c1': 0.5, 'w': 0.9, 'k': 5, 'p': 2}
+2022-10-31 12:06:13,620 - pyswarms.backend.operators - ERROR - Missing keyword in swarm.options
+Traceback (most recent call last):
+  File "/data/yutingh/miniconda3/envs/exp/lib/python3.9/site-packages/pyswarms/backend/operators.py", line 129, in compute_velocity
+    c2 = swarm.options["c2"]
+KeyError: 'c2'
+2022-10-31 12:08:47,137 - pyswarms.discrete.binary - INFO - Optimize for 2 iters with {'c1': 0.5, 'c2': 0.3, 'w': 0.9, 'k': 5, 'p': 2}
+2022-10-31 12:08:47,146 - pyswarms.discrete.binary - INFO - Optimization finished | best cost: 0.0, best pos: [0]
+2022-10-31 12:10:33,935 - pyswarms.discrete.binary - INFO - Optimize for 2 iters with {'c1': 0.5, 'c2': 0.3, 'w': 0.9, 'k': 5, 'p': 2}
+2022-10-31 12:10:33,944 - pyswarms.discrete.binary - INFO - Optimization finished | best cost: 0.0, best pos: [0 0 1 0 0 0 1 0 0 0]

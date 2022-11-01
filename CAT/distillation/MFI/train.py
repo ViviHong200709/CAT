@@ -1,0 +1,35 @@
+"""     
+    get theta ,get a b, [theta][alpha,beta]
+    compute MFI by getMFI top-k
+    compute by dot production
+    conpute loss
+"""
+from CAT.distillation.MFI.model import dMFIModel 
+from CAT.distillation.tool import transform,split_data
+import torch
+import json
+dataset='junyi'
+cdm='irt'
+trait = json.load(open(f'/data/yutingh/CAT/data/{dataset}/trait.json', 'r'))
+utrait = trait['user']
+itrait = trait['item']
+# print(utrait,itrait)
+label = trait['label']
+k_fisher = trait['k_fisher']
+train_data, test_data = split_data(utrait,label,k_fisher,0.8)
+# utrait_train,label_train,k_fisher_train = split_data(utrait,label,k_fisher,0.8)
+
+torch.manual_seed(0)
+train_set = transform(itrait,*train_data)
+test_set = transform(itrait,*test_data)
+k=50
+embedding_dim=15    
+lr=0.005 if dataset=='assistment' else 0.01
+print(f'lr: {lr}')
+dMFI = dMFIModel(k,embedding_dim,device='cuda:3')
+dMFI.train(train_set,test_set,itrait,epoch=1,lr=lr)
+dMFI.save(f'/data/yutingh/CAT/ckpt/{dataset}/{cdm}_ip.pt')
+
+
+
+
