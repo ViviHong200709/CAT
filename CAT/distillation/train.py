@@ -28,11 +28,12 @@ train_set = transform(itrait,*train_data)
 test_set = transform(itrait,*test_data)
 k=50
 embedding_dim=15  
+epoch=30
 lr=0.005 if dataset=='assistment' else 0.01
 print(f'lr: {lr}')
 user_dim=2 if stg =='KLI'else 1
 dMFI = dMFIModel(k,embedding_dim,user_dim,device='cuda:4')
-dMFI.train(train_set,test_set,itrait,epoch=30,lr=lr)
+dMFI.train(train_set,test_set,itrait,epoch=epoch,lr=lr)
 dMFI.save(f'/data/yutingh/CAT/ckpt/{dataset}/{cdm}_{stg}_ip.pt')
 
 

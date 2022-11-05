@@ -23,7 +23,7 @@ def setuplogger():
 
 import os
 os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
-def main(dataset="assistment", cdm="irt", stg = ['KLI'], test_length = 20, ctx="cuda:4", lr=0.2, num_epoch=1, efficient=False):
+def main(dataset="assistment", cdm="irt", stg = ['Random'], test_length = 20, ctx="cuda:4", lr=0.2, num_epoch=1, efficient=False):
     lr=0.15 if dataset=='assistment' else 0.2
     setuplogger()
     seed = 0
@@ -46,7 +46,6 @@ def main(dataset="assistment", cdm="irt", stg = ['KLI'], test_length = 20, ctx="
     ckpt_path = f'/data/yutingh/CAT/ckpt/{dataset}/{cdm}.pt'
     # read datasets
     test_triplets = pd.read_csv(f'/data/yutingh/CAT/data/{dataset}/test_triples.csv', encoding='utf-8').to_records(index=False)
-    # test_triplets = pd.read_csv(f'/data/yutingh/CAT/data/{dataset}/test_filled_triplets.csv', encoding='utf-8').to_records(index=False)
     concept_map = json.load(open(f'/data/yutingh/CAT/data/{dataset}/item_topic.json', 'r'))
     concept_map = {int(k):v for k,v in concept_map.items()}
 
@@ -73,7 +72,7 @@ def main(dataset="assistment", cdm="irt", stg = ['KLI'], test_length = 20, ctx="
         model.adaptest_load(ckpt_path)
         test_data.reset()
         if efficient:
-            ball_trait = json.load(open(f'/data/yutingh/CAT/data/{dataset}/ball_trait.json', 'r'))
+            ball_trait = json.load(open(f'/data/yutingh/CAT/data/{dataset}/{stg[i]}/ball_trait.json', 'r'))
             distill_k=50
             embedding_dim=15
             user_dim=2 if stg[0]=='KLI' else 1
