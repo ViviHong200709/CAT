@@ -10,7 +10,6 @@ CAT.egg-info/requires.txt
 CAT.egg-info/top_level.txt
 CAT/cognitive_structure/__init__.py
 CAT/cognitive_structure/structure.py
-CAT/cognitive_structure/test.py
 CAT/dataset/__init__.py
 CAT/dataset/adaptest_dataset.py
 CAT/dataset/dataset.py

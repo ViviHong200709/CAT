@@ -204,6 +204,7 @@ class IRTModel(AbstractModel):
         data = adaptest_data.data
         device = self.config['device']
         untested = adaptest_data.untested[sid]
+        # untested = adaptest_data.data[sid].keys()
 
         real = []
         pred = []

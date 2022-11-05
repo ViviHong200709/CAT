@@ -10,10 +10,13 @@ import torch
 from tqdm import tqdm
 import numpy as np
 from CAT.distillation.tool import get_label_and_k
+import random
 
-
+seed = 0
+random.seed(seed)
 cdm='irt'
-dataset = 'assistment'
+dataset = 'junyi'
+stg='KLI'
 train_triplets = pd.read_csv(
         f'/data/yutingh/CAT/data/{dataset}/train_triples.csv', encoding='utf-8').to_records(index=False)
 ckpt_path = f'/data/yutingh/CAT/ckpt/{dataset}/{cdm}_with_theta.pt'
@@ -43,10 +46,7 @@ elif cdm == 'ncd':
     model = CAT.model.NCDModel(**config)
 model.init_model(train_data)
 model.adaptest_load(ckpt_path)
-# trait_log=[]
-# for row in train_data:
-#     print(row)
-#     break
+
 user_dict={}
 for user_id in tqdm(range(train_data.num_students),'gettting theta'):
     sid = torch.LongTensor([user_id]).to(config['device'])
@@ -58,23 +58,16 @@ for item_id in tqdm(range(train_data.num_questions),'gettting alpha beta'):
     alpha=model.get_alpha(qid)
     beta=model.get_beta(qid)
     item_dict[item_id]=[np.float(alpha[0]),np.float(beta[0])]
-label,k_fisher = get_label_and_k(user_dict,item_dict,50)
+label,k_info,tested_info = get_label_and_k(user_dict,item_dict,50,stg)
 trait_dict = {
     'user':user_dict,
     'item':item_dict,
     'label':label,
-    'k_fisher':k_fisher
+    'k_info':k_info,
+    'tested_info':tested_info
 }
     
-    
-# for user_id,item_id,score in tqdm(train_triplets,'getting traits'):
-#     sid = torch.LongTensor([user_id]).to(config['device'])
-#     qid = torch.LongTensor([item_id]).to(config['device'])
-#     difficulty=model.get_beta(qid)
-#     discrimination=model.get_alpha(qid)
-#     theta=model.get_theta(sid)
-#     trait_log.append([theta[0],[difficulty[0],discrimination[0]]])
-path_prefix = f"/data/yutingh/CAT/data/{dataset}/"
+path_prefix = f"/data/yutingh/CAT/data/{dataset}/{stg}/"
 
 with open(f"{path_prefix}trait.json", "w", encoding="utf-8") as f:
     # indent参数保证json数据的缩进，美观 

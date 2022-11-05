@@ -9,7 +9,7 @@ import numpy as np
 from copy import deepcopy
 from tqdm import tqdm
 import pandas as pd
-from CAT.distillation.model import dMFIModel 
+from CAT.distillation.MFI.model import dMFIModel 
 from CAT.mips.ball_tree import BallTree,search_metric_tree
 
 def setuplogger():
@@ -23,8 +23,7 @@ def setuplogger():
 
 import os
 os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
-def main(dataset="assistment", cdm="irt", stg = ['KLI'], test_length = 20, ctx="cuda:4", lr=0.2, num_epoch=1, efficient=False):
-    lr=0.15 if dataset=='assistment' else 0.2
+def main(dataset="assistment", cdm="irt", stg = ['MFI'], test_length = 20, ctx="cuda:4", lr=0.2, num_epoch=1, efficient=True):
     setuplogger()
     seed = 0
     np.random.seed(seed)
@@ -76,8 +75,7 @@ def main(dataset="assistment", cdm="irt", stg = ['KLI'], test_length = 20, ctx="
             ball_trait = json.load(open(f'/data/yutingh/CAT/data/{dataset}/ball_trait.json', 'r'))
             distill_k=50
             embedding_dim=15
-            user_dim=2 if stg[0]=='KLI' else 1
-            dMFI = dMFIModel(distill_k,embedding_dim,user_dim,device=ctx)
+            dMFI = dMFIModel(distill_k,embedding_dim,device=ctx)
             dMFI.load(f'/data/yutingh/CAT/ckpt/{dataset}/{cdm}_{stg[i]}_ip.pt')
         logging.info('-----------')
         logging.info(f'start adaptive testing with {strategy.name} strategy')
@@ -103,11 +101,7 @@ def main(dataset="assistment", cdm="irt", stg = ['KLI'], test_length = 20, ctx="
             for it in range(1, test_length + 1):
                 starttime = datetime.datetime.now()
                 if efficient:
-                    if stg[i]=='KLI':
-                        theta = tmp_model.model.theta(torch.tensor(sid).to(ctx))
-                        u_emb = dMFI.model.utn(torch.cat((theta,torch.Tensor([it]).to(ctx)),0)).tolist()
-                    else:
-                        u_emb = dMFI.model.utn(tmp_model.model.theta(torch.tensor(sid).to(ctx))).tolist()
+                    u_emb = dMFI.model.utn(tmp_model.model.theta(torch.tensor(sid).to(ctx))).tolist()
                     candidates=dict(zip(list(range(metadata['num_questions'],metadata['num_questions']+it)),[0]*it))
                     search_metric_tree(candidates,np.array(u_emb),T)
                     untested_qids = set(candidates.keys())-set(test_data.tested[sid])
