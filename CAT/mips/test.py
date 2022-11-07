@@ -23,25 +23,27 @@ def setuplogger():
 
 import os
 os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
-def main(dataset="assistment", cdm="irt", stg = ['Random'], test_length = 20, ctx="cuda:4", lr=0.2, num_epoch=1, efficient=False):
-    lr=0.15 if dataset=='assistment' else 0.2
+def main(dataset="assistment", cdm="irt", stg = ['MFI'], test_length = 20, ctx="cuda:4", lr=0.2, num_epoch=1, efficient=True):
+    # lr=0.05 if dataset=='assistment' else 0.2
     setuplogger()
     seed = 0
     np.random.seed(seed)
     torch.manual_seed(seed)
-
-    config = {
-        'learning_rate': lr,
-        'batch_size': 2048,
-        'num_epochs': num_epoch,
-        'num_dim': 1, # for IRT or MIRT
-        'device': ctx,
-        # for NeuralCD
-        'prednet_len1': 128,
-        'prednet_len2': 64,
-        # 'prednet_len1': 64,
-        # 'prednet_len2': 32,
+    lr_config={
+        "assistment":{
+            "MFI":0.15,
+            "KLI":0.15,
+            "Random":0.05,
+            'MAAT':0.15
+        },
+       "junyi":{
+            "MFI":0.2,
+            "KLI":0.2,
+            "Random":0.2,
+            'MAAT':0.15
+       } 
     }
+    
     metadata = json.load(open(f'/data/yutingh/CAT/data/{dataset}/metadata.json', 'r'))
     ckpt_path = f'/data/yutingh/CAT/ckpt/{dataset}/{cdm}.pt'
     # read datasets
@@ -64,6 +66,18 @@ def main(dataset="assistment", cdm="irt", stg = ['Random'], test_length = 20, ct
     df = pd.DataFrame() 
     df1 = pd.DataFrame()
     for i, strategy in enumerate(strategies):
+        config = {
+            'learning_rate': lr_config[dataset][stg[i]],
+            'batch_size': 2048,
+            'num_epochs': num_epoch,
+            'num_dim': 1, # for IRT or MIRT
+            'device': ctx,
+            # for NeuralCD
+            'prednet_len1': 128,
+            'prednet_len2': 64,
+            # 'prednet_len1': 64,
+            # 'prednet_len2': 32,
+        }
         if cdm == 'irt':
             model = CAT.model.IRTModel(**config)
         elif cdm =='ncd':
@@ -72,15 +86,20 @@ def main(dataset="assistment", cdm="irt", stg = ['Random'], test_length = 20, ct
         model.adaptest_load(ckpt_path)
         test_data.reset()
         if efficient:
-            ball_trait = json.load(open(f'/data/yutingh/CAT/data/{dataset}/{stg[i]}/ball_trait.json', 'r'))
+            ball_trait = json.load(open(f'/data/yutingh/CAT/data/{dataset}/{stg[i]}/ball_trait_with_tested_info.json', 'r'))
+            trait = json.load(open(f'/data/yutingh/CAT/data/{dataset}/{stg[i]}/trait_with_tested_info.json', 'r'))
             distill_k=50
             embedding_dim=15
-            user_dim=2 if stg[0]=='KLI' else 1
+            if 'tested_info' in trait:
+                tested_info= trait['tested_info']
+                user_dim=np.array(tested_info).shape[-1]+1
+            else:
+                user_dim=1
             dMFI = dMFIModel(distill_k,embedding_dim,user_dim,device=ctx)
-            dMFI.load(f'/data/yutingh/CAT/ckpt/{dataset}/{cdm}_{stg[i]}_ip.pt')
+            dMFI.load(f'/data/yutingh/CAT/ckpt/{dataset}/{cdm}_{stg[i]}_ip_with_tested_info.pt')
         logging.info('-----------')
         logging.info(f'start adaptive testing with {strategy.name} strategy')
-
+        logging.info('lr: ' + str(config['learning_rate']))
         logging.info(f'Iteration 0')
         res=[]
         time=0
@@ -99,27 +118,36 @@ def main(dataset="assistment", cdm="irt", stg = ['Random'], test_length = 20, ct
             results = tmp_model.evaluate(sid, test_data)
             tmp =[list(results.values())]
             time = datetime.timedelta(microseconds=0)
+            tested_info=[]
             for it in range(1, test_length + 1):
                 starttime = datetime.datetime.now()
                 if efficient:
-                    if stg[i]=='KLI':
-                        theta = tmp_model.model.theta(torch.tensor(sid).to(ctx))
-                        u_emb = dMFI.model.utn(torch.cat((theta,torch.Tensor([it]).to(ctx)),0)).tolist()
+                    theta = tmp_model.model.theta(torch.tensor(sid).to(ctx))
+                    if user_dim==1:
+                        u_emb = dMFI.model.utn(theta).tolist()
                     else:
-                        u_emb = dMFI.model.utn(tmp_model.model.theta(torch.tensor(sid).to(ctx))).tolist()
+                        if stg[i]=='KLI':
+                            u_emb = dMFI.model.utn(torch.cat((theta,torch.Tensor([it]).to(ctx)),0)).tolist()
+                        elif stg[i]=='MFI':
+                            if len(test_data.tested[sid])==0:
+                                avg_tested_emb=np.array([0,0]).tolist()
+                            else:
+                                avg_tested_emb = np.array([trait['item'][str(qid)] for qid in test_data.tested[sid]]).mean(axis=0).tolist()
+                            avg_tested_emb.extend([it])
+                            u_emb = dMFI.model.utn(torch.cat((theta,torch.Tensor(avg_tested_emb).to(ctx)),0)).tolist()
                     candidates=dict(zip(list(range(metadata['num_questions'],metadata['num_questions']+it)),[0]*it))
                     search_metric_tree(candidates,np.array(u_emb),T)
                     untested_qids = set(candidates.keys())-set(test_data.tested[sid])
                     # print(it, untested_qids)
-                    if len(untested_qids) == 1:
-                        max_score = 0 
-                        for k,v in candidates.items():
-                            if k in untested_qids:
-                                if v>max_score:
-                                    qid=k
-                                    max_score=v
-                    else:
-                       qid = strategy.adaptest_select(tmp_model, sid, test_data,item_candidates=untested_qids) 
+                    # if len(untested_qids) == 1:
+                    max_score = 0 
+                    for k,v in candidates.items():
+                        if k in untested_qids:
+                            if v>max_score:
+                                qid=k
+                                max_score=v
+                    # else:
+                    #    qid = strategy.adaptest_select(tmp_model, sid, test_data,item_candidates=untested_qids) 
                 else:
                     qid = strategy.adaptest_select(tmp_model, sid, test_data)
                 test_data.apply_selection(sid, qid)

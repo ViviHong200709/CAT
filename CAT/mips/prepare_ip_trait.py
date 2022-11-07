@@ -12,12 +12,18 @@ from CAT.distillation.tool import get_label_and_k, split_data, transform
 
 dataset='assistment'
 cdm='irt'
-stg='KLI'
-trait = json.load(open(f'/data/yutingh/CAT/data/{dataset}/{stg}/trait.json', 'r'))
+stg='MFI'
+trait = json.load(open(f'/data/yutingh/CAT/data/{dataset}/{stg}/trait_with_tested_info.json', 'r'))
 utrait = trait['user']
 itrait = trait['item']
 label = trait['label']
 k_info = trait['k_info']
+if 'tested_info' in trait:
+    tested_info= trait['tested_info']
+    user_dim=np.array(tested_info).shape[-1]+1
+else:
+    user_dim=1
+    
 train_data, test_data = split_data(utrait,label,k_info,0.8)
 
 torch.manual_seed(0)
@@ -25,9 +31,8 @@ train_set = transform(itrait,*train_data)
 test_set = transform(itrait,*test_data)
 k=50
 embedding_dim=15
-user_dim=2 if stg =='KLI'else 1
 dMFI = dMFIModel(k,embedding_dim,user_dim,device='cuda:0')
-dMFI.load(f'/data/yutingh/CAT/ckpt/{dataset}/{cdm}_{stg}_ip.pt')
+dMFI.load(f'/data/yutingh/CAT/ckpt/{dataset}/{cdm}_{stg}_ip_with_tested_info.pt')
 # dMFI.eval(test_set,itrait)
 ball_embs=[]
 max_embs_len=torch.tensor(0.)
@@ -47,7 +52,7 @@ for i in tqdm(itrait.items()):
 
 path_prefix = f"/data/yutingh/CAT/data/{dataset}/{stg}/"
 
-with open(f"{path_prefix}ball_trait.json", "w", encoding="utf-8") as f:
+with open(f"{path_prefix}ball_trait_with_tested_info.json", "w", encoding="utf-8") as f:
     # indent参数保证json数据的缩进，美观 
     # ensure_ascii=False才能输出中文，否则就是Unicode字符
     f.write(json.dumps(ball_embs, ensure_ascii=False))

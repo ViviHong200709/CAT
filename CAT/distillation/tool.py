@@ -21,27 +21,39 @@ def split_data(utrait,label,k_fisher,rate=1,tested_info=None):
     else:
         return ((u_train,label[:max_len],k_fisher[:max_len]),(u_test,label[max_len:],k_fisher[max_len:]))
     
-def get_label_and_k(user_trait,item_trait,k,stg="MFI"):
+def get_label_and_k(user_trait,item_trait,k,stg="MFI", model=None):
     labels=[]
     k_infos=[]
-    tested_ns=[]
-    for theta in tqdm(user_trait.values(),f'get top {k} items'):
+    tested_infos=[]
+    for sid, theta in tqdm(user_trait.items(),f'get top {k} items'):
         if stg=='MFI':
-            k_info,label = get_k_fisher(k, theta, item_trait)
+            k_info, label, tested_info = get_k_fisher(k, theta, item_trait)
+            tested_infos.append(tested_info)
         elif stg=='KLI':
-            k_info,label,tested_n= get_k_kli(k, theta, item_trait)
-            tested_ns.append(tested_n)
+            k_info,label,tested_info= get_k_kli(k, theta, item_trait)
+            tested_infos.append(tested_info)
+        elif stg=='MAAT':
+            get_k_emc(k, sid,theta, item_trait, model)
         k_infos.append(k_info)
         labels.append(label)
-    return labels,k_infos,tested_ns
+    return labels,k_infos,tested_infos
 
 def transform(item_trait, user_trait,labels,k_fishers,tested_infos=None):
     if tested_infos:
         for theta, label, k_fisher,tested_info in zip(user_trait.values(),labels,k_fishers,tested_infos):
             itrait = list(item_trait.values())
             item_n = len(itrait)
+            user_embs=[]
+            for tmp in tested_info:
+                user_emb = [theta]
+                if type(tmp) == list:
+                    user_emb.extend(tmp)
+                else:
+                    user_emb.append(tmp)
+                user_embs.append(user_emb)
             yield pack_batch([
-                torch.tensor(list(zip([theta]*item_n,tested_info))),
+                torch.tensor(user_embs),
+                # torch.tensor(list(zip([theta]*item_n,tested_info))),
                 itrait,
                 label,
                 k_fisher
@@ -65,16 +77,87 @@ def pack_batch(batch):
 
 def get_k_fisher(k, theta, items):
     fisher_arr = []
-    for qid,(alpha,beta) in items.items():
+    items_n=len(items.keys())
+    ns = [random.randint(0,19) for i in range(items_n)]
+    tested_qids = [random.sample(list(range(0,20)),n) for n in ns]
+    avg_embs = np.array(list(items.values())).mean(axis=0)
+    p=0.001
+    avg_tested_embs=[]
+    for tested_qid, (qid,(alpha,beta)) in zip(tested_qids,items.items()):
+        # tested_qid
+        if len(tested_qid)==0:
+            avg_tested_emb=np.array([0,0])
+        else:
+            avg_tested_emb = np.array([items[qid] for qid in tested_qid]).mean(axis=0)
+        item_emb=[alpha,beta]
         pred = alpha * theta + beta
         pred = torch.sigmoid(torch.tensor(pred))
         # pred = 1 / (1 + np.exp(-pred))
         q = 1 - pred
-        fisher_info = float((q*pred*(alpha ** 2)).numpy())
+        diff = ((item_emb-avg_tested_emb)**2).sum()
+        sim = ((item_emb-avg_embs)**2).sum()
+        fisher_info = float((q*pred*(alpha ** 2)).numpy()) + p*diff/sim
         fisher_arr.append((fisher_info,qid))
+        avg_tested_embs.append(avg_tested_emb.tolist())
     fisher_arr_sorted = sorted(fisher_arr, reverse=True)
-    return [i[1] for i in fisher_arr_sorted[:k]],[i[0]for i in fisher_arr]
+    tested_info=[]
+    for avg_tested_emb,n in zip(avg_tested_embs,ns):
+        avg_tested_emb.extend([n])
+        tested_info.append(avg_tested_emb)
+    return [i[1] for i in fisher_arr_sorted[:k]],[i[0]for i in fisher_arr],tested_info
 
+def get_k_emc(k,sid,theta,items,model):
+    epochs = model.config['num_epochs']
+    lr = model.config['learning_rate']
+    device = model.config['device']
+    optimizer = torch.optim.Adam(model.model.parameters(), lr=lr)
+    res_arr = []
+    for qid,(alpha,beta) in items.items():
+        for name, param in model.model.named_parameters():
+            if 'theta' not in name:
+                param.requires_grad = False
+
+        original_weights = model.model.theta.weight.data.clone()
+
+        student_id = torch.LongTensor([sid]).to(device)
+        question_id = torch.LongTensor([qid]).to(device)
+        correct = torch.LongTensor([1]).to(device).float()
+        wrong = torch.LongTensor([0]).to(device).float()
+
+        for ep in range(epochs):
+            optimizer.zero_grad()
+            pred = model.model(student_id, question_id)
+            loss = model._loss_function(pred, correct)
+            loss.backward()
+            optimizer.step()
+
+        pos_weights = model.model.theta.weight.data.clone()
+        model.model.theta.weight.data.copy_(original_weights)
+
+        for ep in range(epochs):
+            optimizer.zero_grad()
+            pred = model.model(student_id, question_id)
+            loss = model._loss_function(pred, wrong)
+            loss.backward()
+            optimizer.step()
+
+        neg_weights = model.model.theta.weight.data.clone()
+        # model.model.theta.weight.data.copy_(original_weights)
+
+        for param in model.model.parameters():
+            param.requires_grad = True
+        
+        if type(alpha) == float:
+            alpha = np.array([alpha])
+        if type(theta) == float:
+            theta = np.array([theta])
+        pred = np.matmul(alpha.T, theta) + beta
+        pred = 1 / (1 + np.exp(-pred))
+        result = pred * torch.norm(pos_weights - original_weights).item() + \
+            (1 - pred) * torch.norm(neg_weights - original_weights).item()
+        res_arr.append((result,qid))
+    res_arr_sorted = sorted(res_arr, reverse=True)
+    return [i[1] for i in res_arr_sorted[:k]],[i[0]for i in res_arr]
 
            
 def get_k_kli(k, theta, items):
