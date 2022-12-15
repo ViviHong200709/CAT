@@ -43,7 +43,7 @@ def run(cdm, model, dataset, *args, **kwargs):
 
 def main(dataset="assistment", cdm="irt", ctx="cuda:3", num_epochs=1, num_dim = 1, lr=0.025):
     setuplogger()
-    num_epochs=15 if dataset=="assistment" else 1
+    num_epochs=8 if dataset=="assistment" else 1
     config = {
         'learning_rate': lr,
         'batch_size': 2048,

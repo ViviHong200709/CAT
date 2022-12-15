@@ -4,10 +4,10 @@ import torch.nn as nn
 import numpy as np
 from tqdm import tqdm
     
-class dMFI(nn.Module):
+class distill(nn.Module):
     def __init__(self,embedding_dim,user_dim):
         # self.prednet_input_len =1
-        super(dMFI, self).__init__()
+        super(distill, self).__init__()
         self.utn = nn.Sequential(
             nn.Linear(user_dim, 256), nn.Sigmoid(
             ),
@@ -31,12 +31,47 @@ class dMFI(nn.Module):
         return (user * item).sum(dim=-1, keepdim=True)
         # return user*item
     
-class dMFIModel(object):
-    def __init__(self, k, embedding_dim,user_dim,device):
-        self.model = dMFI(embedding_dim,user_dim)
+class distillModel(object):
+    def __init__(self, k, embedding_dim, user_dim,device):
+        self.model = distill(embedding_dim,user_dim)
         # 20 1 1 
         self.k = k
         self.device=device
+        
+    def train_rank(self,train_data,test_data,item_pool,lr=0.01,epoch=2):
+        self.model=self.model.to(self.device)
+        train_data=list(train_data)
+        test_data=list(test_data)
+        self.eval(test_data,item_pool)
+        optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)
+        loss = []
+        for epoch_i in range(epoch):
+            for data in tqdm(train_data,f'Epoch {epoch_i+1} '):
+                utrait,itrait,label,k_items=data
+                itrait = itrait.squeeze()
+                indices = torch.tensor(k_items).to(self.device)
+                u_loss: torch.Tensor  = torch.tensor(0.).to(self.device)
+                utrait:torch.Tensor = utrait.to(self.device)
+                itrait: torch.Tensor = itrait.to(self.device)
+                label: torch.Tensor = label.to(self.device)
+                kutrait = torch.index_select(utrait, 0, indices)
+                kitrait = torch.index_select(itrait, 0, indices)
+                # klabel = torch.index_select(label, 0, indices)
+                score = self.model(kutrait,kitrait).squeeze(-1)
+                r = torch.arange(1,self.k+1).to(self.device)
+                a=torch.tensor(20.).to(self.device)
+                score1 = torch.cat([score[1:],score[49:]],dim=0)
+                # u_loss = (-torch.exp(-r/a)*torch.log(torch.sigmoid(score-score1))).sum()
+                u_loss = (-torch.log(torch.sigmoid(score-score1))).sum()
+                # u_loss=((score-label)**2).sum()
+                loss.append(u_loss.item())
+                optimizer.zero_grad()
+                u_loss.backward()
+                optimizer.step()
+                # print(float(np.mean(loss)))
+                # self.eval(valid_data,item_pool)
+            print('Loss: ',float(np.mean(loss)))
+            self.eval(test_data,item_pool)
     
     def train(self,train_data,test_data,item_pool,lr=0.01,epoch=2):
         self.model=self.model.to(self.device)
@@ -74,6 +109,7 @@ class dMFIModel(object):
         torch.save(model_dict, path)
     
     def eval(self,valid_data,item_pool):
+        self.model=self.model.to(self.device)
         k_nums=[1,3,5,10,30,50]
         recall = [[]for i in k_nums]
         for data in tqdm(valid_data,'testing'):

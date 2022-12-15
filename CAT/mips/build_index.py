@@ -1,6 +1,6 @@
 import json
 from CAT.mips.ball_tree import BallTree,search_metric_tree
-from CAT.distillation.MFI.model import dMFIModel 
+from CAT.distillation.model import dMFIModel 
 import numpy as np
 import torch
 import datetime

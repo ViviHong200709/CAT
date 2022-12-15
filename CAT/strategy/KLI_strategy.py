@@ -32,6 +32,7 @@ class KLIStrategy(AbstractStrategy):
         # untested_questions = np.array(list(adaptest_data.untested[sid]))
         untested_kli = [model.get_kli(sid, qid, n, pred_all) for qid in untested_questions]
         j = np.argmax(untested_kli)
+        print(untested_kli[j])
         # selection[sid] = untested_questions[j]
         return untested_questions[j]
 

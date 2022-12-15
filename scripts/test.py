@@ -24,7 +24,7 @@ def setuplogger():
 # num_epoch=1
 import os
 os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
-def main(dataset="junyi", cdm="irt", stg = ['Random'], test_length = 20, ctx="cpu", lr=0.2, num_epoch=8):
+def main(dataset="junyi", cdm="irt", stg = ['MFI'], test_length = 20, ctx="cpu", lr=0.2, num_epoch=8):
     setuplogger()
     seed = 0
     np.random.seed(seed)

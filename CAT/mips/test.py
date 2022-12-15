@@ -9,7 +9,7 @@ import numpy as np
 from copy import deepcopy
 from tqdm import tqdm
 import pandas as pd
-from CAT.distillation.model import dMFIModel 
+from CAT.distillation.model import distillModel 
 from CAT.mips.ball_tree import BallTree,search_metric_tree
 
 def setuplogger():
@@ -23,7 +23,7 @@ def setuplogger():
 
 import os
 os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
-def main(dataset="assistment", cdm="irt", stg = ['MFI'], test_length = 20, ctx="cuda:4", lr=0.2, num_epoch=1, efficient=True):
+def main(dataset="assistment", cdm="irt", stg = ['Random'], test_length = 20, ctx="cuda:0", lr=0.2, num_epoch=1, efficient=False):
     # lr=0.05 if dataset=='assistment' else 0.2
     setuplogger()
     seed = 0
@@ -85,9 +85,11 @@ def main(dataset="assistment", cdm="irt", stg = ['MFI'], test_length = 20, ctx="
         model.init_model(test_data)
         model.adaptest_load(ckpt_path)
         test_data.reset()
+        with_tested_info=False
+        postfix = '_with_tested_info' if with_tested_info else ''
         if efficient:
-            ball_trait = json.load(open(f'/data/yutingh/CAT/data/{dataset}/{stg[i]}/ball_trait_with_tested_info.json', 'r'))
-            trait = json.load(open(f'/data/yutingh/CAT/data/{dataset}/{stg[i]}/trait_with_tested_info.json', 'r'))
+            trait = json.load(open(f'/data/yutingh/CAT/data/{dataset}/{stg[i]}/trait{postfix}.json', 'r'))
+            ball_trait = json.load(open(f'/data/yutingh/CAT/data/{dataset}/{stg[i]}/ball_trait{postfix}.json', 'r'))
             distill_k=50
             embedding_dim=15
             if 'tested_info' in trait:
@@ -95,8 +97,8 @@ def main(dataset="assistment", cdm="irt", stg = ['MFI'], test_length = 20, ctx="
                 user_dim=np.array(tested_info).shape[-1]+1
             else:
                 user_dim=1
-            dMFI = dMFIModel(distill_k,embedding_dim,user_dim,device=ctx)
-            dMFI.load(f'/data/yutingh/CAT/ckpt/{dataset}/{cdm}_{stg[i]}_ip_with_tested_info.pt')
+            dmodel = distillModel(distill_k,embedding_dim,user_dim,device=ctx)
+            dmodel.load(f'/data/yutingh/CAT/ckpt/{dataset}/{cdm}_{stg[i]}_ip{postfix}.pt')
         logging.info('-----------')
         logging.info(f'start adaptive testing with {strategy.name} strategy')
         logging.info('lr: ' + str(config['learning_rate']))
@@ -104,7 +106,10 @@ def main(dataset="assistment", cdm="irt", stg = ['MFI'], test_length = 20, ctx="
         res=[]
         time=0
         # starttime = datetime.datetime.now()
+        logs=[]
         for sid in tqdm(test_data.data.keys(),'testing '):
+            #todo
+            log=[]
             if efficient:
                 # time += (datetime.datetime.now() - starttime).seconds
                 qids = test_data.untested[sid]
@@ -124,32 +129,34 @@ def main(dataset="assistment", cdm="irt", stg = ['MFI'], test_length = 20, ctx="
                 if efficient:
                     theta = tmp_model.model.theta(torch.tensor(sid).to(ctx))
                     if user_dim==1:
-                        u_emb = dMFI.model.utn(theta).tolist()
+                        u_emb = dmodel.model.utn(theta).tolist()
                     else:
                         if stg[i]=='KLI':
-                            u_emb = dMFI.model.utn(torch.cat((theta,torch.Tensor([it]).to(ctx)),0)).tolist()
+                            u_emb = dmodel.model.utn(torch.cat((theta,torch.Tensor([it]).to(ctx)),0)).tolist()
                         elif stg[i]=='MFI':
                             if len(test_data.tested[sid])==0:
                                 avg_tested_emb=np.array([0,0]).tolist()
                             else:
                                 avg_tested_emb = np.array([trait['item'][str(qid)] for qid in test_data.tested[sid]]).mean(axis=0).tolist()
                             avg_tested_emb.extend([it])
-                            u_emb = dMFI.model.utn(torch.cat((theta,torch.Tensor(avg_tested_emb).to(ctx)),0)).tolist()
+                            u_emb = dmodel.model.utn(torch.cat((theta,torch.Tensor(avg_tested_emb).to(ctx)),0)).tolist()
                     candidates=dict(zip(list(range(metadata['num_questions'],metadata['num_questions']+it)),[0]*it))
                     search_metric_tree(candidates,np.array(u_emb),T)
                     untested_qids = set(candidates.keys())-set(test_data.tested[sid])
                     # print(it, untested_qids)
-                    # if len(untested_qids) == 1:
-                    max_score = 0 
-                    for k,v in candidates.items():
-                        if k in untested_qids:
-                            if v>max_score:
-                                qid=k
-                                max_score=v
-                    # else:
-                    #    qid = strategy.adaptest_select(tmp_model, sid, test_data,item_candidates=untested_qids) 
+                    if len(untested_qids) == 1:
+                        max_score = 0 
+                        for k,v in candidates.items():
+                            if k in untested_qids:
+                                if v>max_score:
+                                    qid=k
+                                    max_score=v
+                    else:
+                       qid = strategy.adaptest_select(tmp_model, sid, test_data,item_candidates=untested_qids) 
                 else:
-                    qid = strategy.adaptest_select(tmp_model, sid, test_data)
+                     qid = strategy.adaptest_select(tmp_model, sid, test_data)
+                log.append([float(tmp_model.get_theta(torch.LongTensor([sid]).to(ctx))),float(tmp_model.get_alpha(torch.LongTensor([qid]).to(ctx))[0]),float(tmp_model.get_beta(torch.LongTensor([qid]).to(ctx))[0])])
+                # print(log)
                 test_data.apply_selection(sid, qid)
                 tmp_model.adaptest_update(sid, qid, test_data)
                 time += (datetime.datetime.now() - starttime)
@@ -158,6 +165,10 @@ def main(dataset="assistment", cdm="irt", stg = ['MFI'], test_length = 20, ctx="
                 results['time']=time.seconds+time.microseconds*1e-6
                 tmp.append(list(results.values()))
             res.append(tmp)
+            logs.append(log)
+        with open(f'/data/yutingh/CAT/data/{dataset}/{stg[i]}/log.json', "w", encoding="utf-8") as f:
+            f.write(json.dumps(logs, ensure_ascii=False))
+
         # time +=  (datetime.datetime.now() - starttime).seconds
         res = torch.mean(torch.Tensor(res).permute(2,1,0), dim=-1).tolist()
         exp_info={

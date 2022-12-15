@@ -25,10 +25,23 @@ def get_label_and_k(user_trait,item_trait,k,stg="MFI", model=None):
     labels=[]
     k_infos=[]
     tested_infos=[]
+    # thetas=[0.,0.2,0.4,0.6,0.8,1.0]
+    # for theta in thetas:
+    #     k_info, label, tested_info = get_k_fisher(k, theta, item_trait)
+    #     tested_infos.append(tested_info)
+    #     # print('\n',theta,'\n',k_info)
+    #     # print("===============")
+    #     k_infos.append(k_info)
+    #     labels.append(label)
+    # print(k_infos)
+    # return labels,k_infos,tested_infos
     for sid, theta in tqdm(user_trait.items(),f'get top {k} items'):
+        # print(theta)
         if stg=='MFI':
             k_info, label, tested_info = get_k_fisher(k, theta, item_trait)
             tested_infos.append(tested_info)
+            # print('\n',theta,'\n',k_info)
+            # print("===============")
         elif stg=='KLI':
             k_info,label,tested_info= get_k_kli(k, theta, item_trait)
             tested_infos.append(tested_info)
@@ -75,36 +88,51 @@ def pack_batch(batch):
         theta, Tensor(itrait), Tensor(label), k_fisher
     )
 
-def get_k_fisher(k, theta, items):
+def get_k_fisher(k,theta,items):
     fisher_arr = []
-    items_n=len(items.keys())
-    ns = [random.randint(0,19) for i in range(items_n)]
-    tested_qids = [random.sample(list(range(0,20)),n) for n in ns]
-    avg_embs = np.array(list(items.values())).mean(axis=0)
-    p=0.001
-    avg_tested_embs=[]
-    for tested_qid, (qid,(alpha,beta)) in zip(tested_qids,items.items()):
-        # tested_qid
-        if len(tested_qid)==0:
-            avg_tested_emb=np.array([0,0])
-        else:
-            avg_tested_emb = np.array([items[qid] for qid in tested_qid]).mean(axis=0)
-        item_emb=[alpha,beta]
+    for qid,(alpha,beta) in items.items():
         pred = alpha * theta + beta
         pred = torch.sigmoid(torch.tensor(pred))
         # pred = 1 / (1 + np.exp(-pred))
         q = 1 - pred
-        diff = ((item_emb-avg_tested_emb)**2).sum()
-        sim = ((item_emb-avg_embs)**2).sum()
-        fisher_info = float((q*pred*(alpha ** 2)).numpy()) + p*diff/sim
+        fisher_info = float((q*pred*(alpha ** 2)).numpy())
         fisher_arr.append((fisher_info,qid))
-        avg_tested_embs.append(avg_tested_emb.tolist())
     fisher_arr_sorted = sorted(fisher_arr, reverse=True)
-    tested_info=[]
-    for avg_tested_emb,n in zip(avg_tested_embs,ns):
-        avg_tested_emb.extend([n])
-        tested_info.append(avg_tested_emb)
-    return [i[1] for i in fisher_arr_sorted[:k]],[i[0]for i in fisher_arr],tested_info
+    return [i[1] for i in fisher_arr_sorted[:k]],[i[0]for i in fisher_arr],[]
+
+# def get_k_fisher(k, theta, items):
+#     fisher_arr = []
+#     items_n=len(items.keys())
+#     ns = [random.randint(0,19) for i in range(items_n)]
+#     tested_qids = [random.sample(list(range(0,20)),n) for n in ns]
+#     avg_embs = np.array(list(items.values())).mean(axis=0)
+#     p=0.002
+#     # p=0.01
+#     avg_tested_embs=[]
+#     for tested_qid, (qid,(alpha,beta)) in zip(tested_qids,items.items()):
+#         # tested_qid
+#         if len(tested_qid)==0:
+#             avg_tested_emb=np.array([0,0])
+#         else:
+#             avg_tested_emb = np.array([items[qid] for qid in tested_qid]).mean(axis=0)
+#         item_emb=[alpha,beta]
+#         pred = alpha * theta + beta
+#         pred = torch.sigmoid(torch.tensor(pred))
+#         # pred = 1 / (1 + np.exp(-pred))
+#         q = 1 - pred
+#         diff = ((item_emb-avg_tested_emb)**2).sum()
+#         sim = ((item_emb-avg_embs)**2).sum()
+#         fisher_info = float((q*pred*(alpha ** 2)).numpy()) + p*diff/sim
+#         # print(float((q*pred*(alpha ** 2)).numpy()),0.01*diff/sim)
+#         fisher_arr.append((fisher_info,qid,0.05*diff/sim))
+#         avg_tested_embs.append(avg_tested_emb.tolist())
+#     fisher_arr_sorted = sorted(fisher_arr, reverse=True)
+#     tested_info=[]
+#     for avg_tested_emb,n in zip(avg_tested_embs,ns):
+#         avg_tested_emb.extend([n])
+#         tested_info.append(avg_tested_emb)
+#     # print([i[0] for i in fisher_arr_sorted[:k]],'\n',[i[2] for i in fisher_arr_sorted[:k]])
+#     return [i[1] for i in fisher_arr_sorted[:k]],[i[0]for i in fisher_arr],tested_info
 
 def get_k_emc(k,sid,theta,items,model):
     epochs = model.config['num_epochs']

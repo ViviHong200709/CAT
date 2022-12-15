@@ -37,14 +37,16 @@ class IRT(nn.Module):
 
     def forward(self, student_ids, question_ids):
         theta = self.theta(student_ids)
+        # if len(student_ids)==1:
+        #     print('=========================',theta[0])
         alpha = self.alpha(question_ids)
         beta = self.beta(question_ids)
+        # pred = (alpha * theta).sum(dim=1, keepdim=True) + beta
+        if self.a_range is not None:
+            alpha = self.a_range * torch.sigmoid(alpha)
+        else:
+            alpha = F.softplus(alpha)
         pred = (alpha * theta).sum(dim=1, keepdim=True) + beta
-        # if self.a_range is not None:
-        #     a = self.a_range * torch.sigmoid(a)
-        # else:
-        #     a = F.softplus(a)
-        # pred = (alpha * theta).sum(dim=1, keepdim=True) - beta
         pred = torch.sigmoid(pred)
         return pred
 
@@ -189,16 +191,17 @@ class IRTModel(AbstractModel):
         qid = torch.LongTensor([qid]).to(device)
         label = torch.LongTensor([label]).to(device).float()
         pred = self.model(sid, qid).view(-1)
+        print('theta',self.get_theta(sid))
+        print('a:',self.get_alpha(qid))
+        print('b:',self.get_beta(qid))
+        print(label.tolist(),' ', pred.tolist())
+        print('================================')
         bz_loss = self._loss_function(pred, label)
         optimizer.zero_grad()
         bz_loss.backward()
         optimizer.step()
         if scheduler is not None:
             scheduler.step()
-        # print('\nlabel:',label)
-        # print('difficulty:',self.get_beta(qid))
-        # print('disc:',self.get_alpha(qid))
-        # print('theta:',self.get_theta(sid))
 
     def evaluate(self, sid, adaptest_data: AdapTestDataset):
         data = adaptest_data.data
@@ -287,7 +290,15 @@ class IRTModel(AbstractModel):
         Returns:
             alpha of the given question, shape (num_dim, )
         """
-        return self.model.alpha.weight.data.cpu().numpy()[question_id]
+        device = self.config['device']
+        qid = torch.LongTensor([question_id]).to(device)
+        alpha = self.model.alpha(qid)
+        if self.model.a_range is not None:
+            alpha = self.model.a_range * torch.sigmoid(alpha)
+        else:
+            alpha = F.softplus(alpha)
+        return alpha.clone().detach().cpu()[0]
+        # return self.model.alpha.weight.data.cpu().numpy()[question_id]
 
     def get_beta(self, question_id):
         """ get beta of one question
@@ -362,7 +373,9 @@ class IRTModel(AbstractModel):
         """
         device = self.config['device']
         qid = torch.LongTensor([question_id]).to(device)
-        alpha = self.model.alpha(qid).clone().detach().cpu()
+        # alpha = self.model.alpha(qid).clone().detach().cpu()
+        alpha = self.get_alpha(qid)
+        
         pred = pred_all[student_id][question_id]
         q = 1 - pred
         fisher_info = (q*pred*(alpha * alpha.T)).numpy()

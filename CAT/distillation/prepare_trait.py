@@ -17,6 +17,8 @@ random.seed(seed)
 cdm='irt'
 dataset = 'assistment'
 stg='MFI'
+with_tested_info=False
+postfix = '_with_tested_info' if with_tested_info else ''
 train_triplets = pd.read_csv(
         f'/data/yutingh/CAT/data/{dataset}/train_triples.csv', encoding='utf-8').to_records(index=False)
 ckpt_path = f'/data/yutingh/CAT/ckpt/{dataset}/{cdm}_with_theta.pt'
@@ -59,17 +61,25 @@ for item_id in tqdm(range(train_data.num_questions),'gettting alpha beta'):
     beta=model.get_beta(qid)
     item_dict[item_id]=[np.float(alpha[0]),np.float(beta[0])]
 label,k_info,tested_info = get_label_and_k(user_dict,item_dict,50,stg,model)
-trait_dict = {
-    'user':user_dict,
-    'item':item_dict,
-    'label':label,
-    'k_info':k_info,
-    'tested_info':tested_info
-}
+if with_tested_info:
+    trait_dict = {
+        'user':user_dict,
+        'item':item_dict,
+        'label':label,
+        'k_info':k_info,
+        'tested_info':tested_info
+    }
+else:
+    trait_dict = {
+        'user':user_dict,
+        'item':item_dict,
+        'label':label,
+        'k_info':k_info,
+    }
     
 path_prefix = f"/data/yutingh/CAT/data/{dataset}/{stg}/"
 
-with open(f"{path_prefix}trait_with_tested_info.json", "w", encoding="utf-8") as f:
+with open(f"{path_prefix}trait{postfix}.json", "w", encoding="utf-8") as f:
     # indent参数保证json数据的缩进，美观 
     # ensure_ascii=False才能输出中文，否则就是Unicode字符
     f.write(json.dumps(trait_dict, ensure_ascii=False))
