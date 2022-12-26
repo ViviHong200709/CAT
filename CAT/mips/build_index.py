@@ -1,26 +1,35 @@
 import json
 from CAT.mips.ball_tree import BallTree,search_metric_tree
-from CAT.distillation.model import dMFIModel 
+from CAT.distillation.model import distillModel 
 import numpy as np
 import torch
 import datetime
 from tqdm import tqdm
 import heapq
-dataset='junyi'
+dataset='assistment'
+stg="MFI"
 cdm='irt'
-ball_trait = json.load(open(f'/data/yutingh/CAT/data/{dataset}/ball_trait.json', 'r'))
-model = BallTree(dict(zip(range(len(ball_trait)),ball_trait)))
+postfix='_s'
+path_prefix = f"/data/yutingh/CAT/data/{dataset}/{stg}/"
+# with open(f"{path_prefix}ball_trait{postfix}.json", "w", encoding="utf-8") as f:
+ball_trait = json.load(open(f"{path_prefix}ball_trait{postfix}.json", 'r'))
+item_label = json.load(open(f"{path_prefix}item_label.json", 'r'))
+# model = BallTree(dict(zip(range(len(ball_trait)),ball_trait)),item_label)
+
+model = BallTree(dict(zip(range(len(ball_trait)),list(zip(item_label,ball_trait)))))
 trait = json.load(open(f'/data/yutingh/CAT/data/{dataset}/trait.json', 'r'))
 utrait = trait['user']
 itrait = trait['item']
         
 distill_k=50
 embedding_dim=15
-ctx='cuda:4'
-dMFI = dMFIModel(distill_k,embedding_dim,device=ctx)
-dMFI.load(f'/data/yutingh/CAT/ckpt/{dataset}/{cdm}_ip.pt')
+ctx='cuda:0'
+user_dim=1
+dMFI = distillModel(distill_k,embedding_dim,user_dim, device=ctx)
+dMFI.load(f'/data/yutingh/CAT/ckpt/{dataset}/{cdm}_{stg}_ip{postfix}.pt')
+# dMFI.load(f'/data/yutingh/CAT/ckpt/{dataset}/{cdm}_ip{postfix}.pt')
 
-k=10
+k=20
 efficient = False
 starttime= datetime.datetime.now()
 for _,q in tqdm(utrait.items()):

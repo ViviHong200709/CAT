@@ -36,11 +36,11 @@ train_set = transform(itrait,*train_data)
 test_set = transform(itrait,*test_data)
 k=50
 embedding_dim=15  
-epoch=5
+epoch=20
 lr=0.005 if dataset=='assistment' else 0.01
 print(f'lr: {lr}')
-model = distillModel(k,embedding_dim,user_dim,device='cuda:2')
-model.load(f'/data/yutingh/CAT/ckpt/{dataset}/{cdm}_{stg}_ip{postfix}.pt')
+model = distillModel(k,embedding_dim,user_dim,device='cuda:1')
+# model.load(f'/data/yutingh/CAT/ckpt/{dataset}/{cdm}_{stg}_ip{postfix}.pt')
 model.train(train_set,test_set,itrait,epoch=epoch,lr=lr)
 model.save(f'/data/yutingh/CAT/ckpt/{dataset}/{cdm}_{stg}_ip{postfix}.pt')
 

@@ -18,7 +18,7 @@ def run(cdm, model, dataset, *args, **kwargs):
     # read datasets
     train_triplets = pd.read_csv(f'/data/yutingh/CAT/data/{dataset}/train_triples.csv', encoding='utf-8').to_records(index=False)
     valid_triplets = pd.read_csv(f'/data/yutingh/CAT/data/{dataset}/valid_triples.csv', encoding='utf-8').to_records(index=False)
-    concept_map = json.load(open(f'/data/yutingh/CAT/data/{dataset}/item_topic.json', 'r'))
+    concept_map = json.load(open(f'/data/yutingh/CAT/data/{dataset}/concept_map.json', 'r'))
     concept_map = {int(k):v for k,v in concept_map.items()}
     metadata = json.load(open(f'/data/yutingh/CAT/data/{dataset}/metadata.json', 'r'))
     train_data = CAT.dataset.TrainDataset(train_triplets, concept_map,
@@ -41,7 +41,7 @@ def run(cdm, model, dataset, *args, **kwargs):
     model.adaptest_save(f'/data/yutingh/CAT/ckpt/{dataset}/{cdm}.pt')
     model.adaptest_save(f'/data/yutingh/CAT/ckpt/{dataset}/{cdm}_with_theta.pt',save_theta=True)
 
-def main(dataset="assistment", cdm="irt", ctx="cuda:3", num_epochs=1, num_dim = 1, lr=0.025):
+def main(dataset="ifytek", cdm="irt", ctx="cuda:3", num_epochs=1, num_dim = 1, lr=0.025):
     setuplogger()
     num_epochs=8 if dataset=="assistment" else 1
     config = {

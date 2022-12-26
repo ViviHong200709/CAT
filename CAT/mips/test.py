@@ -11,6 +11,7 @@ from tqdm import tqdm
 import pandas as pd
 from CAT.distillation.model import distillModel 
 from CAT.mips.ball_tree import BallTree,search_metric_tree
+import heapq
 
 def setuplogger():
     root = logging.getLogger()
@@ -23,7 +24,7 @@ def setuplogger():
 
 import os
 os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
-def main(dataset="assistment", cdm="irt", stg = ['Random'], test_length = 20, ctx="cuda:0", lr=0.2, num_epoch=1, efficient=False):
+def main(dataset="assistment", cdm="irt", stg = ['MFI'], test_length = 20, ctx="cuda:4", lr=0.2, num_epoch=1, efficient=True):
     # lr=0.05 if dataset=='assistment' else 0.2
     setuplogger()
     seed = 0
@@ -89,10 +90,12 @@ def main(dataset="assistment", cdm="irt", stg = ['Random'], test_length = 20, ct
         postfix = '_with_tested_info' if with_tested_info else ''
         if efficient:
             trait = json.load(open(f'/data/yutingh/CAT/data/{dataset}/{stg[i]}/trait{postfix}.json', 'r'))
+            postfix=''
             ball_trait = json.load(open(f'/data/yutingh/CAT/data/{dataset}/{stg[i]}/ball_trait{postfix}.json', 'r'))
+            item_label = json.load(open(f"/data/yutingh/CAT/data/{dataset}/{stg[i]}/item_label.json", 'r'))
             distill_k=50
             embedding_dim=15
-            if 'tested_info' in trait:
+            if with_tested_info:
                 tested_info= trait['tested_info']
                 user_dim=np.array(tested_info).shape[-1]+1
             else:
@@ -114,16 +117,21 @@ def main(dataset="assistment", cdm="irt", stg = ['Random'], test_length = 20, ct
                 # time += (datetime.datetime.now() - starttime).seconds
                 qids = test_data.untested[sid]
                 selected_ball_trait = {}
-                for k,v in enumerate(ball_trait):
+                for k,v in enumerate(zip(item_label,ball_trait)):
                     if k in qids:
-                        selected_ball_trait[k]=ball_trait[k]
+                        selected_ball_trait[k]=v
                 T = BallTree(selected_ball_trait)
                 # starttime = datetime.datetime.now()
             tmp_model= deepcopy(model)
             results = tmp_model.evaluate(sid, test_data)
+            results['count']=0
             tmp =[list(results.values())]
             time = datetime.timedelta(microseconds=0)
             tested_info=[]
+            res_q={'qid':-1,'quantity':-1,'leaves':{}}
+            # theta qids
+            # candidates =set()
+            candidates={}
             for it in range(1, test_length + 1):
                 starttime = datetime.datetime.now()
                 if efficient:
@@ -140,19 +148,47 @@ def main(dataset="assistment", cdm="irt", stg = ['Random'], test_length = 20, ct
                                 avg_tested_emb = np.array([trait['item'][str(qid)] for qid in test_data.tested[sid]]).mean(axis=0).tolist()
                             avg_tested_emb.extend([it])
                             u_emb = dmodel.model.utn(torch.cat((theta,torch.Tensor(avg_tested_emb).to(ctx)),0)).tolist()
-                    candidates=dict(zip(list(range(metadata['num_questions'],metadata['num_questions']+it)),[0]*it))
-                    search_metric_tree(candidates,np.array(u_emb),T)
-                    untested_qids = set(candidates.keys())-set(test_data.tested[sid])
-                    # print(it, untested_qids)
-                    if len(untested_qids) == 1:
-                        max_score = 0 
-                        for k,v in candidates.items():
-                            if k in untested_qids:
-                                if v>max_score:
-                                    qid=k
-                                    max_score=v
+                    tested_set = set(test_data.tested[sid])
+                    untested_inl = list(set(res_q['leaves'].keys())-tested_set)
+                    if len(untested_inl)!=0:
+                        tmp_ip = [np.dot(np.array(u_emb),np.array(ball_trait[q])) for q in untested_inl]
+                        qip = heapq.nlargest(1, tmp_ip)
+                        qid = untested_inl[list(map(tmp_ip.index, qip))[0]]
+                        res_q['qid']=qid
+                        res_q['quantity']=qip[0]
                     else:
-                       qid = strategy.adaptest_select(tmp_model, sid, test_data,item_candidates=untested_qids) 
+                        res_q={'qid':-1,'quantity':-1,'leaves':{}}
+                    count  = search_metric_tree(res_q, tested_set,np.array(u_emb),T)
+                    qid = res_q['qid']
+                    flag = False
+                    print('=================================')
+                    print(theta.tolist()[0])
+                    for _it, candidate in candidates.items():
+                        if qid in candidate:
+                            print('found in ', _it)
+                            flag=True
+                            break
+                    if not flag:
+                        print(f'save in {it}')
+                        candidates[it]=list(res_q['leaves'].keys())
+                    # candidates.update(set(res_q['leaves'].keys()))
+                    
+                    # for val in candidates.values():
+                    # if qid ==233:
+                    #     print(qid, count)
+                    # candidates=dict(zip(list(range(metadata['num_questions'],metadata['num_questions']+it)),[0]*it))
+                    # count  = search_metric_tree(candidates,np.array(u_emb),T)
+                    # untested_qids = set(candidates.keys())-set(test_data.tested[sid])
+                    # print(it, untested_qids)
+                    # if len(untested_qids) == 1:
+                    #     max_score = 0 
+                    #     for k,v in candidates.items():
+                    #         if k in untested_qids:
+                    #             if v>max_score:
+                    #                 qid=k
+                    #                 max_score=v
+                    # else:
+                    #    qid = strategy.adaptest_select(tmp_model, sid, test_data,item_candidates=untested_qids) 
                 else:
                      qid = strategy.adaptest_select(tmp_model, sid, test_data)
                 log.append([float(tmp_model.get_theta(torch.LongTensor([sid]).to(ctx))),float(tmp_model.get_alpha(torch.LongTensor([qid]).to(ctx))[0]),float(tmp_model.get_beta(torch.LongTensor([qid]).to(ctx))[0])])
@@ -163,7 +199,9 @@ def main(dataset="assistment", cdm="irt", stg = ['Random'], test_length = 20, ct
                 results = tmp_model.evaluate(sid, test_data)
                 del results['cov']
                 results['time']=time.seconds+time.microseconds*1e-6
+                results['count']=count
                 tmp.append(list(results.values()))
+                # print(tmp)
             res.append(tmp)
             logs.append(log)
         with open(f'/data/yutingh/CAT/data/{dataset}/{stg[i]}/log.json', "w", encoding="utf-8") as f:
@@ -174,7 +212,8 @@ def main(dataset="assistment", cdm="irt", stg = ['Random'], test_length = 20, ct
         exp_info={
             f"{stg[i]}": ['acc']+res[0],
             " ": ['auc']+res[1],
-            f"": ['time']+res[2]
+            "": ['time']+res[2],
+            "  ": ['count']+res[3]
             }    
         exp_info = pd.DataFrame(exp_info)
         idx= ['']

@@ -15,14 +15,14 @@ import random
 seed = 0
 random.seed(seed)
 cdm='irt'
-dataset = 'assistment'
+dataset = 'ifytek'
 stg='MFI'
 with_tested_info=False
 postfix = '_with_tested_info' if with_tested_info else ''
 train_triplets = pd.read_csv(
         f'/data/yutingh/CAT/data/{dataset}/train_triples.csv', encoding='utf-8').to_records(index=False)
 ckpt_path = f'/data/yutingh/CAT/ckpt/{dataset}/{cdm}_with_theta.pt'
-concept_map = json.load(open(f'/data/yutingh/CAT/data/{dataset}/item_topic.json', 'r'))
+concept_map = json.load(open(f'/data/yutingh/CAT/data/{dataset}/concept_map.json', 'r'))
 concept_map = {int(k):v for k,v in concept_map.items()}
 metadata = json.load(open(f'/data/yutingh/CAT/data/{dataset}/metadata.json', 'r'))
 train_data = CAT.dataset.TrainDataset(train_triplets, concept_map,
@@ -50,10 +50,12 @@ model.init_model(train_data)
 model.adaptest_load(ckpt_path)
 
 user_dict={}
+user_min=user_max=0.5
 for user_id in tqdm(range(train_data.num_students),'gettting theta'):
     sid = torch.LongTensor([user_id]).to(config['device'])
     theta=model.get_theta(sid)
     user_dict[user_id]=np.float(theta[0])
+    # if 
 item_dict={}
 for item_id in tqdm(range(train_data.num_questions),'gettting alpha beta'):
     qid = torch.LongTensor([item_id]).to(config['device'])

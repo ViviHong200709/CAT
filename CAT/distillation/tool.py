@@ -27,7 +27,7 @@ def get_label_and_k(user_trait,item_trait,k,stg="MFI", model=None):
     tested_infos=[]
     # thetas=[0.,0.2,0.4,0.6,0.8,1.0]
     # for theta in thetas:
-    #     k_info, label, tested_info = get_k_fisher(k, theta, item_trait)
+    #     k_info, label, tested_info = get_k_fisher(20, theta, item_trait)
     #     tested_infos.append(tested_info)
     #     # print('\n',theta,'\n',k_info)
     #     # print("===============")
